@@ -121,8 +121,6 @@ class Target {
   }
 
   double execute_posix() {
-    if (devnull == 1)
-      devnull = open("/dev/null", O_WRONLY);
     posix_spawn_file_actions_t actions;
     posix_spawn_file_actions_init(&actions);
     posix_spawn_file_actions_adddup2(&actions, get_devnull(), STDOUT_FILENO);

@@ -7,6 +7,16 @@
 #include <vector>
 using namespace std;
 
+struct ColumnsIndexes {
+  int name = -1;
+  int min_speedup = -1;
+  int min_gain = -1;
+  int speedup = -1;
+  int gain = -1;
+  int mean = -1;
+  int std = -1;
+};
+
 struct Config {
   bool show_help = false;
 
@@ -20,8 +30,16 @@ struct Config {
 
   optional<string> csv_file;
 
-  vector<string_view> columns = {"name", "minSpeedup", "speedup",
-                                 "gain", "mean",       "std"};
+  vector<const char*> column_names = {"Name", "Min Speedup", "Mean", "Std"};
+  ColumnsIndexes column = {
+      .name = 0,
+      .min_speedup = 1,
+      .min_gain = -1,
+      .speedup = -1,
+      .gain = -1,
+      .mean = 2,
+      .std = 3,
+  };
 
   vector<vector<const char*>> targets;
 
@@ -70,7 +88,7 @@ struct Config {
           continue;
         } else if (option_name == "cols") {
           string_view param = argv[++arg_index];
-          columns = parse_list(param);
+          parse_columns(parse_list(param));
           continue;
         } else if (option_name == "conf") {
           string_view param = argv[++arg_index];
@@ -128,8 +146,8 @@ struct Config {
     unsigned int value;
     auto [ptr, ec] = from_chars(s.data(), s.data() + s.size(), value);
     if (ec != errc()) {
-      cout << "Invalid argument " << " '" << s
-           << "' . Expected a positive integer" << endl;
+      cout << "Invalid argument '" << s;
+      cout << "' . Expected a positive integer" << endl;
       exit(1);
     }
     return value;
@@ -139,8 +157,7 @@ struct Config {
     double value;
     auto [ptr, ec] = from_chars(s.data(), s.data() + s.size(), value);
     if (ec != errc()) {
-      cout << "Invalid argument " << " '" << s << "' . Expected a number"
-           << endl;
+      cout << "Invalid argument '" << s << "' . Expected a number" << endl;
       exit(1);
     }
     return value;
@@ -159,31 +176,57 @@ struct Config {
     option_name = option_name.substr(1);
     parse_switch_options(option_name);
   }
+
+  void parse_columns(const vector<string_view>& names) {
+    column = ColumnsIndexes();
+    column_names.clear();
+
+    for (int index = 0; index < names.size(); ++index) {
+      if (names[index] == "name") {
+        column.name = index;
+        column_names.push_back("Name");
+      } else if (names[index] == "minSpeedup") {
+        column.min_speedup = index;
+        column_names.push_back("Min Speedup");
+      } else if (names[index] == "minGain") {
+        column.min_gain = index;
+        column_names.push_back("Min Gain");
+      } else if (names[index] == "speedup") {
+        column.speedup = index;
+        column_names.push_back("Speedup");
+      } else if (names[index] == "gain") {
+        column.gain = index;
+        column_names.push_back("Gain");
+      } else if (names[index] == "mean") {
+        column.mean = index;
+        column_names.push_back("Mean");
+      } else if (names[index] == "std") {
+        column.std = index;
+        column_names.push_back("Std");
+      } else {
+        cout << "Invalid column name '" << names[index];
+        cout << "' . Expected a positive integer" << endl;
+        exit(1);
+      }
+    }
+  }
 };
 
-inline void help() {
-  cout << "Usage: bench [<options>] [-- <command>] [-- <command>] ..." << endl;
-  cout << "Stadistic Options:" << endl;
-  cout
-      << "    --conf <%>  Confidence of the lowerbound (Min Speedup & Min Gain)"
-      << endl;
-  cout << "Sampling Options:" << endl;
-  cout << "    -t <secs>    Minimum seconds inverted in taking samples" << endl;
-  cout << "    -n <num>     Minimum amount of samples" << endl;
-  cout << "    --wt <secs>  Minimum seconds inverted in the warmup" << endl;
-  cout << "    --wn <num>   Minimum amount of samples in the warmup" << endl;
-  cout << "Display Options:" << endl;
-  cout << "    --csv [<file>]  Output a table of samples with csv format"
-       << endl;
-  cout << "    --cols <list>   Columns to show. All options are "
-          "'name,minSpeedup,minGain,speedup,gain,mean,std'"
-       << endl;
-  cout << "    -a              Only use ASCII characters" << endl;
-  cout << "    --no-prefix     Do not use metric prefixes (0.012s instead of "
-          "12ms)"
-       << endl;
-  cout << "Example:" << endl;
-  cout << "    > bench -- bash -c '' -- bash -ic ''" << endl;
-  cout << "    > bench -- sleep 1" << endl;
-  exit(0);
-}
+static const char* HELP =
+    "Usage: bench [<options>] [-- <command>] [-- <command>] ...\n"
+    "Stadistic Options:\n"
+    "    --conf <%>  Confidence of the lowerbound (Min Speedup & Min Gain)\n"
+    "Sampling Options:\n"
+    "    -t <secs>    Minimum seconds inverted in taking samples\n"
+    "    -n <num>     Minimum amount of samples\n"
+    "    --wt <secs>  Minimum seconds inverted in the warmup\n"
+    "    --wn <num>   Minimum amount of samples in the warmup\n"
+    "Display Options:\n"
+    "    --csv [<file>]  Output a table of samples with csv format\n"
+    "    --cols <list>   Columns to show. All options are "
+    "'name,minSpeedup,minGain,speedup,gain,mean,std'\n"
+    "    -a              Only use ASCII characters\n"
+    "    --no-prefix     Do not use metric prefixes (0.012s instead of 12ms)\n"
+    "Example:\n"
+    "    > bench -- bash -ic '' -- bash -c '' -- sh -c ''\n"
+    "    > bench -- sleep 1\n";

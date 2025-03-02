@@ -53,8 +53,10 @@ int main(int argc, const char* argv[]) {
   Config config;
   config.parse_args(argc, argv);
 
-  if (config.show_help || config.targets.empty())
-    help();
+  if (config.show_help || config.targets.empty()) {
+    cout << HELP;
+    return 0;
+  }
 
   vector<Target> targets;
   for (auto& target : config.targets)
@@ -78,7 +80,7 @@ int main(int argc, const char* argv[]) {
 
   DataSet& base = sets[base_index];
 
-  Table table({"Name", "Min Speedup", "Min Gain", "Speedup", "Mean", "Std"});
+  Table table(config.column_names);
 
   // Choose display metric prefix
   MetricPrefix scale;
@@ -114,25 +116,33 @@ int main(int argc, const char* argv[]) {
 
   // Write table
   for (int i = 0; i < targets.size(); ++i) {
-    double gain = 0;
+    double min_gain = 0;
     if (i != base_index)
-      gain = ttest_lower_bound(base, sets[i], config.confidence);
+      min_gain = ttest_lower_bound(base, sets[i], config.confidence);
 
-    double min_speedup = base.real_mean() / (base.real_mean() - gain);
+    double min_speedup = base.real_mean() / (base.real_mean() - min_gain);
     min_speedup = (min_speedup - 1.) * 100.;
 
     double speedup = base.real_mean() / sets[i].real_mean();
     speedup = (speedup - 1.) * 100.;
 
-    table.push(targets[i].name());  // Name
-    table.push(min_speedup <= 0 ? ""
-                                : format(min_speedup) + '%');  // Min Speedup
-    table.push(gain <= 0 ? "" : format(gain, scale) + 's');    // Min Gain
-    table.push(speedup <= 0 ? "" : format(speedup) + '%');     // Speedup
-    table.push(format(sets[i].real_mean(), scale) + 's');      // real_mean()
+    double gain = base.real_mean() - sets[i].real_mean();
+
+    if (min_speedup > 0)
+      table.push(config.column.min_speedup, format(min_speedup) + '%');
+    if (min_gain > 0)
+      table.push(config.column.min_gain, format(min_gain, scale) + 's');
+    if (speedup > 0)
+      table.push(config.column.speedup, format(speedup) + '%');
+    if (gain > 0)
+      table.push(config.column.gain, format(gain) + '%');
 
     const char* plus_minus = config.use_ascii ? "+/- " : "±";
-    table.push(plus_minus + format(sets[i].sd, scale) + 's');  // real_mean()
+    table.push(config.column.std, plus_minus + format(sets[i].sd, scale) + 's');
+    table.push(config.column.name, targets[i].name());
+    table.push(config.column.mean, format(sets[i].real_mean(), scale) + 's');
+
+    table.fill_row(i);
   }
 
   table.print();

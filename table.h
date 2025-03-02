@@ -66,19 +66,24 @@ struct Column {
 
 class Table {
   vector<Column> columns;
-  int column_index = 0;
 
  public:
-  Table(vector<string> header) : columns(header.size()) {
-    for (string& title : header)
-      push(title);
+  Table(vector<const char*> header) : columns(header.size()) {
+    for (int col = 0; col < header.size(); ++col)
+      push(col, header[col]);
   }
 
-  void push(string value) {
-    columns[column_index++].push(value);
+  void push(int column, string value) {
+    if (column >= 0)
+      columns[column].push(value);
+  }
 
-    if (column_index >= columns.size())
-      column_index = 0;
+  void fill_row(int row) {
+    ++row;  // Acount for the header
+    for (Column& column : columns) {
+      while (column.data.size() <= row)
+        column.push("");
+    }
   }
 
   void print() {
