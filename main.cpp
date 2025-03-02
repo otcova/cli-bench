@@ -69,12 +69,12 @@ int main(int argc, const char* argv[]) {
 
   vector<DataSet> sets;
   for (Target& target : targets)
-    sets.emplace_back(target.time_samples());
+    sets.emplace_back(target.time_samples(), config.outliers);
 
   // Analyze
   int base_index = 0;
   for (int i = 0; i < sets.size(); ++i) {
-    if (sets[i].real_mean() > sets[base_index].real_mean())
+    if (sets[i].mean > sets[base_index].mean)
       base_index = i;
   }
 
@@ -93,13 +93,23 @@ int main(int argc, const char* argv[]) {
       bool ok = true;
 
       for (DataSet& set : sets) {
-        ok = ok && set.real_mean() * s.scale >= 1;
+        ok = ok && set.mean * s.scale >= 1;
       }
 
       if (ok)
         scale = s;
       else
         break;
+    }
+  }
+
+  // Choose speedup format
+  bool speedup_precentage = false;
+  for (int i = 0; i < sets.size(); ++i) {
+    if (i != base_index) {
+      double speedup = base.mean / sets[i].mean;
+      if (speedup < 2.)
+        speedup_precentage = true;
     }
   }
 
@@ -120,27 +130,41 @@ int main(int argc, const char* argv[]) {
     if (i != base_index)
       min_gain = ttest_lower_bound(base, sets[i], config.confidence);
 
-    double min_speedup = base.real_mean() / (base.real_mean() - min_gain);
-    min_speedup = (min_speedup - 1.) * 100.;
+    double min_speedup = base.mean / (base.mean - min_gain);
+    if (speedup_precentage)
+      min_speedup = (min_speedup - 1.) * 100.;
 
-    double speedup = base.real_mean() / sets[i].real_mean();
-    speedup = (speedup - 1.) * 100.;
+    double speedup = base.mean / sets[i].mean;
+    if (speedup_precentage)
+      speedup = (speedup - 1.) * 100.;
 
-    double gain = base.real_mean() - sets[i].real_mean();
+    double gain = base.mean - sets[i].mean;
 
-    if (min_speedup > 0)
+    double outliners = 100. * double(sets[i].outliers) / double(sets[i].n);
+
+    if (min_speedup > 0 && speedup_precentage)
       table.push(config.column.min_speedup, format(min_speedup) + '%');
+    if (min_speedup > 1 && !speedup_precentage)
+      table.push(config.column.min_speedup, 'x' + format(min_speedup));
+
+    if (speedup > 0 && speedup_precentage)
+      table.push(config.column.speedup, format(speedup) + '%');
+    if (speedup > 1 && !speedup_precentage)
+      table.push(config.column.speedup, 'x' + format(speedup));
+
     if (min_gain > 0)
       table.push(config.column.min_gain, format(min_gain, scale) + 's');
-    if (speedup > 0)
-      table.push(config.column.speedup, format(speedup) + '%');
+
     if (gain > 0)
-      table.push(config.column.gain, format(gain) + '%');
+      table.push(config.column.gain, format(gain, scale) + 's');
+    if (outliners > 0)
+      table.push(config.column.outliers, format(outliners) + '%');
 
     const char* plus_minus = config.use_ascii ? "+/- " : "±";
     table.push(config.column.std, plus_minus + format(sets[i].sd, scale) + 's');
     table.push(config.column.name, targets[i].name());
-    table.push(config.column.mean, format(sets[i].real_mean(), scale) + 's');
+    table.push(config.column.mean, format(sets[i].mean, scale) + 's');
+    table.push(config.column.samples, to_string(sets[i].n));
 
     table.fill_row(i);
   }

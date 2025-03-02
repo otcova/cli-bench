@@ -1,6 +1,8 @@
+#pragma once
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include "config.h"
 #include "t_quantile.h"
 using namespace std;
 
@@ -50,16 +52,19 @@ struct DataSet {
   double mean;
   double sd;
   int n;
+  int outliers;
 
-  DataSet(const vector<double>& data) {
+  DataSet(const vector<double>& data, HandleOutliners handleOutliers) {
     vector<double> v = data;
-    removeOutliersIQR(v);
+
+    if (handleOutliers == HandleOutliners::Remove)
+      removeOutliersIQR(v);
+
     mean = arithmetic_mean(v);
     sd = standard_deviation(v, mean);
-    n = data.size();
+    n = v.size();
+    outliers = data.size() - v.size();
   }
-
-  double real_mean() { return mean; }
 
  private:
   static inline double arithmetic_mean(const vector<double>& arr) {

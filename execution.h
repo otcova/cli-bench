@@ -1,3 +1,4 @@
+#pragma once
 #include <fcntl.h>
 #include <limits.h>
 #include <spawn.h>

@@ -1,3 +1,4 @@
+#pragma once
 #include <cassert>
 #include <charconv>
 #include <iostream>
@@ -7,6 +8,11 @@
 #include <vector>
 using namespace std;
 
+enum HandleOutliners {
+  Keep,
+  Remove,
+};
+
 struct ColumnsIndexes {
   int name = -1;
   int min_speedup = -1;
@@ -15,13 +21,15 @@ struct ColumnsIndexes {
   int gain = -1;
   int mean = -1;
   int std = -1;
+  int samples = -1;
+  int outliers = -1;
 };
 
 struct Config {
   bool show_help = false;
 
   double min_seconds = 2.;
-  int min_samples = 3;
+  int min_samples = 5;
 
   double min_warmup_seconds = .1;
   int min_warmup_samples = 1;
@@ -30,24 +38,18 @@ struct Config {
 
   optional<string> csv_file;
 
-  vector<const char*> column_names = {"Name", "Min Speedup", "Mean", "Std"};
-  ColumnsIndexes column = {
-      .name = 0,
-      .min_speedup = 1,
-      .min_gain = -1,
-      .speedup = -1,
-      .gain = -1,
-      .mean = 2,
-      .std = 3,
-  };
+  vector<const char*> column_names;
+  ColumnsIndexes column;
+
+  HandleOutliners outliers = HandleOutliners::Remove;
 
   vector<vector<const char*>> targets;
 
   bool use_ascii = false;
   bool no_prefix = false;
 
-  Config parse_args(int argc, const char* const argv[]) {
-    Config config;
+  void parse_args(int argc, const char* const argv[]) {
+    parse_columns({"name", "minSpeedup", "mean", "std", "samples"});
 
     for (int arg_index = 1; arg_index < argc; ++arg_index) {
       string_view arg = argv[arg_index];
@@ -69,6 +71,9 @@ struct Config {
           break;
         } else if (option_name == "help") {
           show_help = true;
+          continue;
+        } else if (option_name == "keep-outlier") {
+          outliers = HandleOutliners::Keep;
           continue;
         } else if (option_name == "no-prefix") {
           no_prefix = true;
@@ -112,8 +117,6 @@ struct Config {
         exit(1);
       }
     }
-
-    return config;
   }
 
  private:
@@ -203,6 +206,12 @@ struct Config {
       } else if (names[index] == "std") {
         column.std = index;
         column_names.push_back("Std");
+      } else if (names[index] == "samples") {
+        column.samples = index;
+        column_names.push_back("Samples");
+      } else if (names[index] == "outliers") {
+        column.outliers = index;
+        column_names.push_back("Outliers");
       } else {
         cout << "Invalid column name '" << names[index];
         cout << "' . Expected a positive integer" << endl;
@@ -214,19 +223,31 @@ struct Config {
 
 static const char* HELP =
     "Usage: bench [<options>] [-- <command>] [-- <command>] ...\n"
-    "Stadistic Options:\n"
-    "    --conf <%>  Confidence of the lowerbound (Min Speedup & Min Gain)\n"
+    "Stadistical Options:\n"
+    "    --conf <%>       Statistical confidence of the lowerbound.\n"
+    "    --keep-outliers  Do not remove outlier.\n"
+    "\n"
     "Sampling Options:\n"
-    "    -t <secs>    Minimum seconds inverted in taking samples\n"
-    "    -n <num>     Minimum amount of samples\n"
-    "    --wt <secs>  Minimum seconds inverted in the warmup\n"
-    "    --wn <num>   Minimum amount of samples in the warmup\n"
+    "    -t <secs>    Minimum seconds inverted in taking samples.\n"
+    "    -n <num>     Minimum amount of samples.\n"
+    "    --wt <secs>  Minimum seconds inverted in the warmup.\n"
+    "    --wn <num>   Minimum amount of samples in the warmup.\n"
+    "\n"
     "Display Options:\n"
-    "    --csv [<file>]  Output a table of samples with csv format\n"
-    "    --cols <list>   Columns to show. All options are "
-    "'name,minSpeedup,minGain,speedup,gain,mean,std'\n"
-    "    -a              Only use ASCII characters\n"
+    "    -a              Only use ASCII characters.\n"
+    "    --csv [<file>]  Output a table of samples with csv format.\n"
     "    --no-prefix     Do not use metric prefixes (0.012s instead of 12ms)\n"
-    "Example:\n"
+    "    --cols <list>   Comma separeted list of columns to show. Options:\n"
+    "                      name       - Command name\n"
+    "                      speedup    - Mean speedup\n"
+    "                      minSpeedup - Statistical speedup lowerbound\n"
+    "                      gain       - Mean gain\n"
+    "                      minGain    - Statistical gain lowerbound\n"
+    "                      mean       - Mean time\n"
+    "                      std        - Standard deviation\n"
+    "                      samples    - Number of usefull samples\n"
+    "                      outliers   - Precentage of removed outliners\n"
+    "\n"
+    "Examples:\n"
     "    > bench -- bash -ic '' -- bash -c '' -- sh -c ''\n"
     "    > bench -- sleep 1\n";
