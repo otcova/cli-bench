@@ -250,4 +250,4 @@ static const char* HELP =
     "\n"
     "Examples:\n"
     "    > bench -- bash -ic '' -- bash -c '' -- sh -c ''\n"
-    "    > bench -- sleep 1\n";
+    "    > bench --cols mean,std -- sleep 1\n";

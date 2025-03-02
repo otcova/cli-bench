@@ -25,7 +25,7 @@ Display Options:
                       samples    - Number of usefull samples
                       outliers   - Precentage of removed outliners
 
-Example:
+Examples:
     > bench -- bash -ic '' -- bash -c '' -- sh -c ''
-    > bench -- sleep 1
+    > bench --cols mean,std -- sleep 1
 ```
