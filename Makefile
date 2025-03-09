@@ -1,4 +1,5 @@
 
 bench: *.cpp *.h
-	g++ main.cpp -o bench -O3 -std=c++17
+	mkdir -p .bin
+	g++ main.cpp -o .bin/bench -O3 -std=c++17
 
